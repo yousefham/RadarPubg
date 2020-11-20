@@ -9,6 +9,7 @@ import 'package:launch_review/launch_review.dart';
 import 'package:root_access/root_access.dart';
 import 'package:flutter_appavailability/flutter_appavailability.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 //import 'package:storage_path/storage_path.dart';
 import 'package:storage_path/storage_path.dart';
 import 'package:provider/provider.dart';
@@ -35,6 +36,7 @@ class CLEAR extends StatefulWidget {
 class _CLEARState extends State<CLEAR> {
   List<StorageInfo> _storageInfo = [];
   Future<void> _launched;
+
   // static const platform = const MethodChannel('clearData');
   bool _rootAccess = false;
 
@@ -42,7 +44,7 @@ class _CLEARState extends State<CLEAR> {
   void initState() {
     super.initState();
     initPlatformState();
-
+    initRootRequest();
   }
 
   Future<void> _launchInBrowser(String url) async {
@@ -58,8 +60,18 @@ class _CLEARState extends State<CLEAR> {
     }
   }
 
+  Future<void> initRootRequest() async {
+    bool rootAccess = await RootAccess.rootAccess;
 
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) return;
 
+    setState(() {
+      _rootAccess = rootAccess;
+    });
+  }
 
   @override
   final GlobalKey<FabCircularMenuState> fabKey = GlobalKey();
@@ -146,19 +158,31 @@ class _CLEARState extends State<CLEAR> {
     );
   }
 
+  Future<File> get _localFile async {
+    final path = await _storageInfo[0].rootDir;
 
+    return File(
+        '$path/Android/data/com.tencent.ig/files/UE4Game/ShadowTrackerExtra/Saved/Logs/ShadowTrackerExtra.log');
+  }
 
   Future<void> deleteFile() async {
     try {
-      AppAvailability.launchApp(
-              "com.salah.manager")
-          .then((_) => print("Lunched"))
-          .catchError((err) {
-        print(err);
-        _launched = _launchInBrowser("https://play.google.com/store/apps/details?id=com.salah.manager");
-
-      });
-
+      if (_rootAccess) {
+        try {
+          File file = await _localFile;
+          file.delete();
+        } catch (err) {
+          print(err);
+        }
+      } else {
+        AppAvailability.launchApp("com.salah.manager")
+            .then((_) => print("Lunched"))
+            .catchError((err) {
+          print(err);
+          _launched = _launchInBrowser(
+              "https://play.google.com/store/apps/details?id=com.salah.manager");
+        });
+      }
     } catch (e) {}
   }
 
